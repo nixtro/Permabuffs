@@ -16,6 +16,8 @@ namespace Permabuffs
     // PermabuffStatus is used for those who are logged in
     public static Dictionary<TSPlayer, bool> NotLoggedInPermabuffStatus = new Dictionary<TSPlayer, bool>();
     // NotLoggedInPermabuffStatus (phew) is used for those who are not logged in
+    // Guards both dictionaries: a player leaving can reach OnPostLogout off the game thread.
+    public static readonly object Sync = new object();
     
     /// <Summary>
     /// Creates, connects, and establishes a proper database and table for use
@@ -45,34 +47,31 @@ namespace Permabuffs
     public static bool GetUserPBStatus(TSPlayer player)
     {
       bool status = true; // Default status
-      if (player.IsLoggedIn) // Check the logged in related data
+      lock (Sync)
       {
-        int userID = player.Account.ID;
-        if (PermabuffStatus.ContainsKey(userID))
+        if (player.IsLoggedIn) // Check the logged in related data
         {
-          status = PermabuffStatus[userID];
-        }
-        else
-        {
-          using (QueryResult result = db.QueryReader("SELECT PBEnabled FROM Permabuffs WHERE userID=@0;", userID))
+          int userID = player.Account.ID;
+          if (!PermabuffStatus.TryGetValue(userID, out status))
           {
-            if (result.Read())
+            status = true;
+            using (QueryResult result = db.QueryReader("SELECT PBEnabled FROM Permabuffs WHERE userID=@0;", userID))
             {
-              status = Convert.ToBoolean(result.Get<int>("PBEnabled"));
+              if (result.Read())
+              {
+                status = Convert.ToBoolean(result.Get<int>("PBEnabled"));
+              }
+              PermabuffStatus[userID] = status;
             }
-            PermabuffStatus.Add(userID, status);
           }
         }
-      }
-      else // Check the not logged in related data
-      {
-        if (NotLoggedInPermabuffStatus.ContainsKey(player))
+        else // Check the not logged in related data
         {
-          status = NotLoggedInPermabuffStatus[player];
-        }
-        else
-        {
-          NotLoggedInPermabuffStatus.Add(player, status);
+          if (!NotLoggedInPermabuffStatus.TryGetValue(player, out status))
+          {
+            status = true;
+            NotLoggedInPermabuffStatus[player] = status;
+          }
         }
       }
       return status;
@@ -102,8 +101,11 @@ namespace Permabuffs
     public static void AddNewUser(int userID, bool status_bool = true)
     {
       int status_int = Convert.ToInt32(status_bool);
-      db.Query("INSERT INTO Permabuffs (userID, PBEnabled) VALUES (@0,  @1);", userID, status_int);
-      PermabuffStatus.Add(userID, status_bool);
+      lock (Sync)
+      {
+        db.Query("INSERT INTO Permabuffs (userID, PBEnabled) VALUES (@0,  @1);", userID, status_int);
+        PermabuffStatus[userID] = status_bool;
+      }
       return;
     }
 
@@ -115,12 +117,12 @@ namespace Permabuffs
     /// </Summary>
     public static void DeleteUser(int userID)
     {
-      if (UserInDB(userID))
+      lock (Sync)
       {
-        db.Query("DELETE FROM Permabuffs WHERE userID=@0", userID);
-      }
-      if (PermabuffStatus.ContainsKey(userID))
-      {
+        if (UserInDB(userID))
+        {
+          db.Query("DELETE FROM Permabuffs WHERE userID=@0", userID);
+        }
         PermabuffStatus.Remove(userID);
       }
       return;
@@ -131,11 +133,14 @@ namespace Permabuffs
     /// </Summary>
     public static void UpdatePermabuffStatus(int userID, bool status)
     {
-      if (!UserInDB(userID))
+      lock (Sync)
       {
-        AddNewUser(userID, status); // I dont think this will ever be reached.
+        if (!UserInDB(userID))
+        {
+          AddNewUser(userID, status); // I dont think this will ever be reached.
+        }
+        db.Query("UPDATE Permabuffs SET PBEnabled=@0 WHERE userID=@1;", Convert.ToInt32(status), userID);
       }
-      db.Query("UPDATE Permabuffs SET PBEnabled=@0 WHERE userID=@1;", Convert.ToInt32(status), userID);
       return;
     }
   }
