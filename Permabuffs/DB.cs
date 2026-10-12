@@ -1,4 +1,4 @@
-using Mono.Data.Sqlite;
+using Microsoft.Data.Sqlite;
 using MySql.Data.MySqlClient;
 using System;
 using System.Collections.Generic;
@@ -25,12 +25,9 @@ namespace Permabuffs
     public static void Connect()
     {
       string sql = Path.Combine(TShock.SavePath, "Permabuffs.sqlite");
-      db = new SqliteConnection(string.Format("uri=file://{0},Version=3", sql));
+      db = new SqliteConnection(string.Format("Data Source={0}", sql));
       
-      SqlTableCreator sqlcreator 
-        = new SqlTableCreator(db, db.GetSqlType() == 
-            SqlType.Sqlite ? (IQueryBuilder)new SqliteQueryCreator() 
-            : new MysqlQueryCreator());
+      SqlTableCreator sqlcreator = new SqlTableCreator(db, db.GetSqlQueryBuilder());
 
       sqlcreator.EnsureTableStructure(
           new SqlTable("Permabuffs",
