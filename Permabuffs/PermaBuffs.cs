@@ -135,12 +135,12 @@ namespace Permabuffs
     public void OnGreet(GreetPlayerEventArgs args)
     {
       TSPlayer player = TShock.Players[args.Who];
-      DB.NotLoggedInPermabuffStatus[player] = player.HasPermission("pb.use");
-      if (ssc_enabled)
+      if (player == null)
       {
         return;
       }
-      if (player == null)
+      DB.NotLoggedInPermabuffStatus[player] = player.HasPermission("pb.use");
+      if (ssc_enabled)
       {
         return;
       }
@@ -231,7 +231,7 @@ namespace Permabuffs
       }
       foreach (Item item in player.TPlayer.bank.item) // Piggy Bank
       {
-        if ((item.stack == 30) && (NameToBuffIDs.BuffIDs.ContainsKey(item.Name)))
+        if ((item.stack >= 30) && (NameToBuffIDs.BuffIDs.ContainsKey(item.Name)))
         {
           int buffID = NameToBuffIDs.BuffIDs[item.Name];
           player.SetBuff(buffID, ticks);
