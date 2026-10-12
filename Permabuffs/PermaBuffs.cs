@@ -215,7 +215,7 @@ namespace Permabuffs
       }
       catch (Exception ex)
       {
-        TShock.Log.ConsoleError("[Permabuffs] Could not save {0}'s permabuff setting: {1}", player.Name, ex.Message);
+        TShock.Log.ConsoleError("[Permabuffs] Could not save {0}'s permabuff setting: {1}", player.Name, ex);
       }
       return;
     }
